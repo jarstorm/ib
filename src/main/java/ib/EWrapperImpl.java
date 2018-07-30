@@ -1,329 +1,376 @@
 package ib;
 
 import java.util.Set;
+import java.util.Vector;
 
 import com.ib.client.*;
 
 public class EWrapperImpl implements EWrapper {
 
-	private EJavaSignal readerSignal;
-	private EClientSocket clientSocket;
-	private EReader reader;
+	// Add for API 9.72 and newer
+	private EJavaSignal m_signal = new EJavaSignal();
+	private EReader m_reader;
 
-	public EJavaSignal getReaderSignal() {
-		return readerSignal;
-	}
-
-	public EClientSocket getClientSocket() {
-		return clientSocket;
-	}
-
-	public EReader getReader() {
-		return reader;
-	}
+	// Keep track of the next ID
+	private int nextOrderID = 0;
+	// The IB API Client Socket object
+	private EClientSocket client = null;
+	// Keep track of prices for Moving Average
+	private double priceTotal;
+	private int numberOfPrices;
 
 	public EWrapperImpl() {
-		readerSignal = new EJavaSignal();
-		clientSocket = new EClientSocket(this, readerSignal);
-		reader = new EReader(clientSocket, readerSignal);
+		// Initialize to 0
+		priceTotal = 0.0;
+		numberOfPrices = 0;
+		// Create a new EClientSocket object version 9.71
+		// client = new EClientSocket (this);
+		client = new EClientSocket(this, m_signal);
+		// Connect to the TWS or IB Gateway application
+		// Leave null for localhost
+		// Port Number (should match TWS/IB Gateway configuration
+		client.eConnect("127.0.0.1", 7497, 0);
+
+		// Pause here for connection to complete
+		try {
+			// Thread.sleep (1000);
+			while (!(client.isConnected()))
+				;
+			// Can also try: while (client.NextOrderId <= 0);
+		} catch (Exception e) {
+		}
+		;
+
+		// API Version 9.72 and later Launch EReader Thread
+		m_reader = new EReader(client, m_signal);
+		m_reader.start();
+		new Thread() {
+			@Override
+			public void run() {
+				processMessages();
+			}
+		}.start();
+
+		// Create a new contract
+		Contract contract = new Contract();
+		contract.symbol("ES");
+		// contract.expiry("20160318");
+		contract.lastTradeDateOrContractMonth("20160318");
+		contract.exchange("GLOBEX");
+		contract.secType("FUT");
+		contract.currency("USD");
+		// Create a TagValue list
+		Vector<TagValue> mktDataOptions = new Vector<TagValue>();
+		// Make a call to start off data retrieval
+		client.reqMktData(0, contract, null, false, mktDataOptions);
+		// For API Version 9.73 and higher, add one more parameter: regulatory snapshot
+		// client.reqMktData(0, contract, null, false, false, mktDataOptions);
+
+		// At this point our call is done and any market data events
+		// will be returned via the tickPrice method
+		client.reqScannerParameters();
+		client.reqAllOpenOrders();
+	} // end RealTimeData
+
+	private void processMessages() {
+		while (true) {
+			try {
+				m_reader.processMsgs();
+			} catch (Exception e) {
+				error(e);
+			}
+		} // end while
+	} // end processMessages()
+
+	// New for API version 9.72.14
+	@Override
+	public void securityDefinitionOptionalParameter(int reqId, String exchange, int underlyingConId, String tradingClass,
+			String multiplier, Set expirations, Set strikes) {
+		// TODO Auto-generated method stub
+	}
+
+	// New for API version 9.72.14
+	@Override
+	public void securityDefinitionOptionalParameterEnd(int reqId) {
+		// TODO Auto-generated method stub
+	}
+
+	// New for API version 9.72.14
+	@Override
+	public void accountUpdateMulti(int reqId, String account, String modelCode, String key, String value, String currency) {
+		// TODO Auto-generated method stub
+	}
+
+	// New for API version 9.72.14
+	@Override
+	public void accountUpdateMultiEnd(int reqId) {
+		// TODO Auto-generated method stub
+	}
+
+	// New for API version 9.72.14
+	@Override
+	public void positionMulti(int reqId, String account, String modelCode, Contract contract, double pos, double avgCost) {
+		// TODO Auto-generated method stub
+	}
+
+	// New for API version 9.72.14
+	@Override
+	public void positionMultiEnd(int reqId) {
+		// TODO Auto-generated method stub
 	}
 
 	@Override
-	public void accountDownloadEnd(String arg0) {
-
-	}
-
-	@Override
-	public void accountSummary(int arg0, String arg1, String arg2, String arg3, String arg4) {
-
-	}
-
-	@Override
-	public void accountSummaryEnd(int arg0) {
-
-	}
-
-	@Override
-	public void bondContractDetails(int arg0, ContractDetails arg1) {
-
-	}
-
-	@Override
-	public void commissionReport(CommissionReport arg0) {
-
-	}
-
-	@Override
-	public void connectAck() {
-
-	}
-
-	@Override
-	public void connectionClosed() {
-
+	public void bondContractDetails(int reqId, ContractDetails contractDetails) {
 	}
 
 	@Override
 	public void contractDetails(int reqId, ContractDetails contractDetails) {
-		System.out.println(EWrapperMsgGenerator.contractDetails(reqId, contractDetails));
-
 	}
 
 	@Override
 	public void contractDetailsEnd(int reqId) {
-		System.out.println("ContractDetailsEnd. " + reqId + "\n");
 	}
 
 	@Override
-	public void currentTime(long arg0) {
+	public void fundamentalData(int reqId, String data) {
+	}
 
+	public void bondContractDetails(ContractDetails contractDetails) {
+	}
+
+	public void contractDetails(ContractDetails contractDetails) {
 	}
 
 	@Override
-	public void deltaNeutralValidation(int arg0, DeltaNeutralContract arg1) {
-
+	public void currentTime(long time) {
 	}
 
 	@Override
-	public void displayGroupList(int arg0, String arg1) {
-
+	public void displayGroupList(int requestId, String contraftInfo) {
 	}
 
 	@Override
-	public void displayGroupUpdated(int arg0, String arg1) {
+	public void displayGroupUpdated(int requestId, String contractInfo) {
+	}
 
+	// Add for API version 9.72
+	@Override
+	public void verifyAndAuthCompleted(boolean isSuccessful, String errorText) {
+	}
+
+	// Add for API version 9.72
+	@Override
+	public void verifyAndAuthMessageAPI(String apiData, String xyzChallange) {
 	}
 
 	@Override
-	public void error(Exception arg0) {
-		System.out.println("Error " + arg0.getMessage());
+	public void verifyCompleted(boolean completed, String contractInfo) {
 	}
 
 	@Override
-	public void error(String arg0) {
-		System.out.println("Error: " + arg0);
+	public void verifyMessageAPI(String message) {
 	}
 
 	@Override
-	public void error(int arg0, int arg1, String arg2) {
-		System.out.println("Error: " + arg0 + ", " + arg1 + ", " + arg2);
+	public void execDetails(int orderId, Contract contract, Execution execution) {
 	}
 
 	@Override
-	public void execDetails(int arg0, Contract arg1, Execution arg2) {
-
+	public void execDetailsEnd(int reqId) {
 	}
 
 	@Override
-	public void execDetailsEnd(int arg0) {
-
+	public void historicalData(int reqId, String date, double open, double high, double low, double close, int volume,
+			int count, double WAP, boolean hasGaps) {
 	}
 
 	@Override
-	public void fundamentalData(int arg0, String arg1) {
-
+	public void managedAccounts(String accountsList) {
 	}
 
 	@Override
-	public void historicalData(int arg0, String arg1, double arg2, double arg3, double arg4, double arg5, int arg6, int arg7,
-			double arg8, boolean arg9) {
-
+	public void commissionReport(CommissionReport cr) {
 	}
 
+	// For API Version 9.72 pos is now a double
 	@Override
-	public void managedAccounts(String arg0) {
-
-	}
-
-	@Override
-	public void marketDataType(int arg0, int arg1) {
-
-	}
-
-	@Override
-	public void nextValidId(int arg0) {
-
-	}
-
-	@Override
-	public void openOrder(int arg0, Contract arg1, Order arg2, OrderState arg3) {
-
-	}
-
-	@Override
-	public void openOrderEnd() {
-
+	public void position(String account, Contract contract, double pos, double avgCost) {
 	}
 
 	@Override
 	public void positionEnd() {
+	}
+
+	@Override
+	public void accountSummary(int reqId, String account, String tag, String value, String currency) {
+	}
+
+	@Override
+	public void accountSummaryEnd(int reqId) {
+	}
+
+	@Override
+	public void accountDownloadEnd(String accountName) {
+	}
+
+	@Override
+	public void openOrder(int orderId, Contract contract, Order order, OrderState orderState) {
+		System.out.println("Orders" + orderId);
+	}
+
+	@Override
+	public void openOrderEnd() {
+		System.out.println("Fin de Orders");
+	}
+
+	// For API Version 9.72
+	@Override
+	public void orderStatus(int orderId, String status, double filled, double remaining, double avgFillPrice, int permId,
+			int parentId, double lastFillPrice, int clientId, String whyHeld) {
+	}
+
+	@Override
+	public void receiveFA(int faDataType, String xml) {
+	}
+
+	@Override
+	public void scannerData(int reqId, int rank, ContractDetails contractDetails, String distance, String benchmark,
+			String projection, String legsStr) {
+		System.out.println("llega");
+	}
+
+	@Override
+	public void scannerDataEnd(int reqId) {
+		System.out.println("llega 2");
+	}
+
+	@Override
+	public void scannerParameters(String xml) {
+		System.out.println("llega xml " + xml);
+	}
+
+	@Override
+	public void tickEFP(int symbolId, int tickType, double basisPoints, String formattedBasisPoints, double impliedFuture,
+			int holdDays, String futureExpiry, double dividendImpact, double dividendsToExpiry) {
+	}
+
+	@Override
+	public void tickGeneric(int symbolId, int tickType, double value) {
+	}
+
+	@Override
+	public void tickOptionComputation(int tickerId, int field, double impliedVol, double delta, double optPrice,
+			double pvDividend, double gamma, double vega, double theta, double undPrice) {
+	}
+
+	// public void deltaNeutralValidation(int reqId, UnderComp underComp)
+	@Override
+	public void deltaNeutralValidation(int reqId, DeltaNeutralContract underComp) {
+	}
+
+	@Override
+	public void updateAccountTime(String timeStamp) {
+	}
+
+	@Override
+	public void updateAccountValue(String key, String value, String currency, String accountName) {
+	}
+
+	@Override
+	public void updateMktDepth(int symbolId, int position, int operation, int side, double price, int size) {
+	}
+
+	@Override
+	public void updateMktDepthL2(int symbolId, int position, String marketMaker, int operation, int side, double price,
+			int size) {
+	}
+
+	@Override
+	public void updateNewsBulletin(int msgId, int msgType, String message, String origExchange) {
+	}
+
+	// For API Version 9.72
+	@Override
+	public void updatePortfolio(Contract contract, double position, double marketPrice, double marketValue, double averageCost,
+			double unrealizedPNL, double realizedPNL, String accountName) {
+	}
+
+	@Override
+	public void marketDataType(int reqId, int marketDataType) {
+	}
+
+	@Override
+	public void tickSnapshotEnd(int tickerId) {
+	}
+
+	@Override
+	public void connectionClosed() {
+	}
+
+	// Add connectAck for API version 9.72
+	@Override
+	public void connectAck() {
+	}
+
+	@Override
+	public void realtimeBar(int reqId, long time, double open, double high, double low, double close, long volume, double wap,
+			int count) {
+	}
+
+	@Override
+	public void error(Exception e) {
+		// Print out a stack trace for the exception
+		e.printStackTrace();
+	}
+
+	@Override
+	public void error(String str) {
+		// Print out the error message
+		System.err.println(str);
+	}
+
+	@Override
+	public void error(int id, int errorCode, String errorMsg) {
+		// Overloaded error event (from IB) with their own error
+		// codes and messages
+		System.err.println("error: " + id + "," + errorCode + "," + errorMsg);
+	}
+
+	@Override
+	public void nextValidId(int orderId) {
+		// Return the next valid OrderID
+		nextOrderID = orderId;
+	}
+
+	@Override
+	public void tickPrice(int orderId, int field, double price, int canAutoExecute) {
+		double movingAverage = 0.0;
+		try {
+			// Print out the current price
+			// field will provide the price type:
+			// 1 = bid, 2 = ask, 4 = last
+			// 6 = high, 7 = low, 9 = close
+			if (field == 4) {
+				numberOfPrices++;
+				priceTotal += price;
+				movingAverage = priceTotal / numberOfPrices;
+				System.out.println("tickPrice: " + orderId + "," + field + "," + price + ", " + movingAverage);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 
 	}
 
 	@Override
-	public void realtimeBar(int arg0, long arg1, double arg2, double arg3, double arg4, double arg5, long arg6, double arg7,
-			int arg8) {
-
+	public void tickSize(int orderId, int field, int size) {
+		// field will provide the size type:
+		// 0=bid size, 3=ask size, 5=last size, 8=volume
+		// System.out.println("tickSize: " + orderId + "," + field + "," + size);
 	}
 
 	@Override
-	public void receiveFA(int arg0, String arg1) {
-
-	}
-
-	@Override
-	public void scannerData(int arg0, int arg1, ContractDetails arg2, String arg3, String arg4, String arg5, String arg6) {
-
-	}
-
-	@Override
-	public void scannerDataEnd(int arg0) {
-
-	}
-
-	@Override
-	public void scannerParameters(String arg0) {
-
-	}
-
-	@Override
-	public void tickEFP(int arg0, int arg1, double arg2, String arg3, double arg4, int arg5, String arg6, double arg7,
-			double arg8) {
-
-	}
-
-	@Override
-	public void tickGeneric(int arg0, int arg1, double arg2) {
-
-	}
-
-	@Override
-	public void tickOptionComputation(int arg0, int arg1, double arg2, double arg3, double arg4, double arg5, double arg6,
-			double arg7, double arg8, double arg9) {
-
-	}
-
-	@Override
-	public void tickPrice(int arg0, int arg1, double arg2, int arg3) {
-
-	}
-
-	@Override
-	public void tickSize(int arg0, int arg1, int arg2) {
-
-	}
-
-	@Override
-	public void tickSnapshotEnd(int arg0) {
-
-	}
-
-	@Override
-	public void tickString(int arg0, int arg1, String arg2) {
-
-	}
-
-	@Override
-	public void updateAccountTime(String arg0) {
-
-	}
-
-	@Override
-	public void updateAccountValue(String arg0, String arg1, String arg2, String arg3) {
-
-	}
-
-	@Override
-	public void updateMktDepth(int arg0, int arg1, int arg2, int arg3, double arg4, int arg5) {
-
-	}
-
-	@Override
-	public void updateMktDepthL2(int arg0, int arg1, String arg2, int arg3, int arg4, double arg5, int arg6) {
-
-	}
-
-	@Override
-	public void updateNewsBulletin(int arg0, int arg1, String arg2, String arg3) {
-
-	}
-
-
-	@Override
-	public void verifyAndAuthCompleted(boolean arg0, String arg1) {
-
-	}
-
-	@Override
-	public void verifyAndAuthMessageAPI(String arg0, String arg1) {
-
-	}
-
-	@Override
-	public void verifyCompleted(boolean arg0, String arg1) {
-
-	}
-
-	@Override
-	public void verifyMessageAPI(String arg0) {
-
-	}
-
-	@Override
-	public void accountUpdateMulti(int arg0, String arg1, String arg2, String arg3, String arg4, String arg5) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void accountUpdateMultiEnd(int arg0) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void orderStatus(int arg0, String arg1, double arg2, double arg3, double arg4, int arg5, int arg6, double arg7,
-			int arg8, String arg9) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void position(String arg0, Contract arg1, double arg2, double arg3) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void positionMulti(int arg0, String arg1, String arg2, Contract arg3, double arg4, double arg5) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void positionMultiEnd(int arg0) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void securityDefinitionOptionalParameter(int arg0, String arg1, int arg2, String arg3, String arg4, Set<String> arg5,
-			Set<Double> arg6) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void securityDefinitionOptionalParameterEnd(int arg0) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void updatePortfolio(Contract arg0, double arg1, double arg2, double arg3, double arg4, double arg5, double arg6,
-			String arg7) {
-		// TODO Auto-generated method stub
-
+	public void tickString(int orderId, int tickType, String value) {
 	}
 
 	@Override
